@@ -76,7 +76,7 @@ shinyUI(fluidPage(
             span('Open each tab below to find predictions especifically from the selected model, predictions from all models,
                  or to download model files for each of the developed. Also, open the following link for more information regarding the 
                  actual process and code used:'),
-            helpText(a("Click Here to open Slidify presentation", href="https://www.kaggle.com/caesarlupum/betsstrategy")), br(), br(),
+            helpText(a("Click Here to open Slidify presentation", href="https://sgomezgomez.github.io/DevelopingDataProducts_FinalAssignment/FootballMatchPrediction_DevelopingDataProduct_ReproduciblePitchPresentation.html")), br(), br(),
             tabsetPanel(type = 'tabs',
                         tabPanel('Selected Model Prediction', br(), 
                                 span('The prediction from the selected model is ...'), br(), br(),
