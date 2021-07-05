@@ -13,6 +13,9 @@ library(parallel)
 library(doParallel)
 library(caretEnsemble)
 library(ranger)
+library(e1071)
+library(kernlab)
+library(ggplot2)
 
 ##kaggle datasets download -d caesarlupum/betsstrategy
 
@@ -71,8 +74,7 @@ shinyUI(fluidPage(
                  (https://www.kaggle.com/caesarlupum/betsstrategy). Data can be downloaded by clicking on the button below:'), br(), br(),
             downloadButton("downloadData", "Download European Soccer Data"), br(), br(),
             span('Open each tab below to find predictions especifically from the selected model, predictions from all models,
-                 to download model files for each of the developed, or find prediction accuracy for each of the models, as per
-                 the training and testing partitions used. Also, open the following link for more information regarding the 
+                 or to download model files for each of the developed. Also, open the following link for more information regarding the 
                  actual process and code used:'),
             helpText(a("Click Here to open Slidify presentation", href="https://www.kaggle.com/caesarlupum/betsstrategy")), br(), br(),
             tabsetPanel(type = 'tabs',
@@ -126,9 +128,8 @@ shinyUI(fluidPage(
                                 h4('Stacked Ramdom Forest - Including all predictions'),
                                 # Download Stacked Random Forest Model Button
                                 downloadButton("downloadStackedRFModel", "Download Stacked Random Forest Model")
-                                ),
-                        tabPanel('Training - Testing Model Accuracies', br())
-                                 
+                                )
+                               
                         ),
             
             

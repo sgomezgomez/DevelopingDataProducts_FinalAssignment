@@ -1,74 +1,104 @@
-## Loading packages and relevant dependencies
-## This code chunk will not be displayed on the R Markdown document
+---
+title: "Football Match Result Prediction using Machine Learning models"
+subtitle: "Reproducible Pitch Presentation - Developing Data Products - Final Assignment"
+author: "Sebastian Gomez"
+date: "7/04/2021"
+output: 
+        ioslides_presentation:
+                keep_md: yes
+---
+
+```{r setup, include=FALSE}
+library(shiny)
 library(caret)
 library(parallel)
 library(doParallel)
 library(caretEnsemble)
 library(ranger)
+library(e1071)
+library(kernlab)
+library(ggplot2)
 cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
 registerDoParallel(cluster)
+```
 
-## Data loading
-##download.file('https://github.com/sgomezgomez/DevelopingDataProducts_FinalAssignment/raw/main/europeansoccerdatabase.zip', 
-##              method = 'curl', destfile = 'europeansoccerdatabase.zip')
+
+<style type="text/css">
+body, td {
+   font-size: 8px;
+}
+code.r{
+  font-size: 13px;
+}
+pre {
+  font-size: 13px
+}
+</style>
+
+## Summary
+
+This presentation describes the process of developing several ML models to predict 
+the result (HOME WINS/DRAW/AWAY WINS) of football matches using the odds published by 2
+of the most famous betting sites: Bet 365 and Blue Square. Below is the code to 
+decompress and preprocess the data used to train the different models, which was downloaded from:
+https://www.kaggle.com/caesarlupum/betsstrategy
+
+
+```{r warning = FALSE}
 unzip('europeansoccerdatabase.zip')
 football = read.csv('FootballDataEurope.csv')
-
-## Removing na values
-football = football[complete.cases(football[, c('country_name', 'league_name', 'home_team', 'away_team','B365H', 'B365D', 'B365A', 'BSH', 'BSD', 'BSA', 'diff_goals')]),]
-football = football[, c('country_name', 'league_name', 'home_team', 'away_team','B365H', 'B365D', 'B365A', 'BSH', 'BSD', 'BSA', 'diff_goals')]
+football = football[complete.cases(football[, c('country_name', 'league_name', 'home_team', 
+        'away_team','B365H', 'B365D', 'B365A', 'BSH', 'BSD', 'BSA', 'diff_goals')]),]
 football$result = football$diff_goals
 football$result[football$result > 0] = 'home wins'
 football$result[football$result < 0] = 'away wins'
 football$result[football$result == 0] = 'draw'
 football$result = as.factor(football$result)
 football$diff_goals = as.factor(football$diff_goals)
+```
 
-## Model training and testing sets
-## Setting seed for reproducibility purposes
+## Training and testing data partitioning
+
+The below code was used to partition the downloaded data set into training and testing sets of
+0.6 and 0.4 complete observations respectively:
+
+```{r warning = FALSE, results = FALSE}
 set.seed(100)
-## Creating model training partition
 modTrainingPartition = createDataPartition(y = football$diff_goals, p = 0.6, list = FALSE)
 fbmodeltraining = football[modTrainingPartition, ]
 fbmodeltesting = football[-modTrainingPartition, ]
-
-
-## Fitting proposed models for results
-data = fbmodeltraining[, !names(fbmodeltraining) %in% c('diff_goals', 'country_name', 'league_name', 'home_team', 'away_team')]
-##data = fbmodeltraining[, !names(fbmodeltraining) %in% c('diff_goals', 'country_name', 'league_name', 'home_team', 'away_team')]
-## Cross validation settings : 10 folds repeat 5 times
+data = fbmodeltraining[, !names(fbmodeltraining) %in% c('diff_goals', 'country_name',
+                        'league_name', 'home_team', 'away_team')]
+football = football[, c('country_name', 'league_name', 'home_team', 'away_team','B365H', 
+                        'B365D', 'B365A', 'BSH', 'BSD', 'BSA', 'diff_goals')]
 fitControl <- trainControl(method = "repeatedcv", number = 5, repeats = 3, 
         allowParallel = TRUE)
-fitControlStacked = trainControl(method = 'cv', number = 10, classProbs = FALSE, 
-        savePredictions = 'final', index = createFolds(data$result, 10), allowParallel = TRUE)
-## RPART model
+```
+
+## Prediction models
+
+The following 7 prediction models were built using the caret package (code is not being evaluated as it is tremendously time consuming, but it can be used for reproducibility purposes):
+
+```{r warning = FALSE, results = FALSE, eval = FALSE}
 fitTreeResult = train(result ~ ., data = data, method = 'rpart', trControl = fitControl)
-## Random Forest model
 fitRFResult = train(result ~ ., data = data, method = 'rf', trControl = fitControl)
-## Neural Network model
 fitNNResult = train(result ~ ., data = data, method = 'nnet', trControl = fitControl)
-## Linear Discriminant Analysis - LDA model
 fitLDAResult = train(result ~ ., data = data, method = 'lda', trControl = fitControl)
-## Ranger model
 fitRangeresult = train(result ~ ., data = data, method = 'ranger', trControl = fitControl)
-## K nearest neighbor model
 fitKNNResult = train(result ~ ., data = data, method = 'knn', trControl = fitControl)
-## SVM Radial model
 fitSVMRadialesult = train(result ~ ., data = data, method = 'svmRadial', trControl = fitControl)
-## Stacked models
-##algorithmList = c('lda', 'rpart', 'nnet', 'ranger', 'rf', 'knn', 'svmRadial')
-##fitStackedResult = caretList(result ~ ., data = data, metric = 'Accuracy',
-##        methodList = algorithmList, trControl = fitControlStacked)
-##stackResults = resamples(fitStackedResult)
-##RFstacked = caretStack(fitStackedResult, method = 'rf', metric = 'Accuracy', trControl = fitControlStacked)
+```
 
-## Fitting proposed models for goal difference
-##fitTreeGoalDiff = train(diff_goals ~ ., data = fbmodeltraining[, !names(fbmodeltraining) %in% c('result', 'country_name', 'league_name', 'home_team', 'away_team')],
-##                      method = 'rpart', trControl = fitControl, na.action = na.exclude)
-##fitRFGoalDiff = train(diff_goals ~ ., data = fbmodeltraining[, !names(fbmodeltraining) %in% c('result', 'country_name', 'league_name', 'home_team', 'away_team')], 
-##              method = 'rf', trControl = fitControl)
+```{r warning = FALSE, include = FALSE}
+fitTreeResult <- readRDS(file = 'ShinyAppFinalAssignment/EuropeanFootballResultPredictionModel_FinalAssignment/fitTreeResult.rds',.GlobalEnv)
+fitRFResult <- readRDS(file = 'ShinyAppFinalAssignment/EuropeanFootballResultPredictionModel_FinalAssignment/fitRFResult.rds',.GlobalEnv)
+fitNNResult <- readRDS(file = 'ShinyAppFinalAssignment/EuropeanFootballResultPredictionModel_FinalAssignment/fitNNResult.rds',.GlobalEnv)
+fitLDAResult <- readRDS(file = 'ShinyAppFinalAssignment/EuropeanFootballResultPredictionModel_FinalAssignment/fitLDAResult.rds',.GlobalEnv)
+fitRangeresult <- readRDS(file = 'ShinyAppFinalAssignment/EuropeanFootballResultPredictionModel_FinalAssignment/fitRangeresult.rds',.GlobalEnv)
+fitKNNResult <- readRDS(file = 'ShinyAppFinalAssignment/EuropeanFootballResultPredictionModel_FinalAssignment/fitKNNResult.rds',.GlobalEnv)
+fitSVMRadialesult <- readRDS(file = 'ShinyAppFinalAssignment/EuropeanFootballResultPredictionModel_FinalAssignment/fitSVMRadialesult.rds',.GlobalEnv)
+fitRFStackedResult <- readRDS(file = 'ShinyAppFinalAssignment/EuropeanFootballResultPredictionModel_FinalAssignment/fitRFStackedResult.rds',.GlobalEnv)
 
-## Predict training values for result
 predTrainTreeResult = predict(fitTreeResult, newdata = fbmodeltraining, na.action = na.exclude)
 predTrainRFResult = predict(fitRFResult, newdata = fbmodeltraining, na.action = na.exclude)
 predTrainNNResult = predict(fitNNResult, newdata = fbmodeltraining, na.action = na.exclude)
@@ -76,8 +106,6 @@ predTrainLDAResult = predict(fitLDAResult, newdata = fbmodeltraining, na.action 
 predTrainRangerResult = predict(fitRangeresult, newdata = fbmodeltraining, na.action = na.exclude)
 predTrainKNNResult = predict(fitKNNResult, newdata = fbmodeltraining, na.action = na.exclude)
 predTrainSVMRadialResult = predict(fitSVMRadialesult, newdata = fbmodeltraining, na.action = na.exclude)
-
-## Stacked trained model
 stackedTrainingPredictions = data.frame(matrix(NA, nrow = length(fbmodeltraining$result), ncol = 0))
 stackedTrainingPredictions$result = fbmodeltraining$result
 stackedTrainingPredictions$predTreeResult = predTrainTreeResult
@@ -87,13 +115,20 @@ stackedTrainingPredictions$predLDAResult = predTrainLDAResult
 stackedTrainingPredictions$predRangerResult = predTrainRangerResult
 stackedTrainingPredictions$predKNNResult = predTrainKNNResult
 stackedTrainingPredictions$predSVMRadialResult = predTrainSVMRadialResult
-fitRFStackedResult = train(result ~ ., data = stackedTrainingPredictions, method = 'rf', trControl = fitControl)
-predTrainRFStackedResult = predict(fitRFStackedResult, newdata = stackedTrainingPredictions, na.action = na.exclude)
+```
 
+And, with their respective predictions, a stacked random forest model was also developed:
+
+```{r warning = FALSE, results = FALSE, eval = FALSE}
+fitRFStackedResult = train(result ~ ., data = stackedTrainingPredictions, method = 'rf', trControl = fitControl)
+```
+
+## Accuracy Results
+
+```{r warning = FALSE, include = FALSE}
+predTrainRFStackedResult = predict(fitRFStackedResult, newdata = stackedTrainingPredictions, na.action = na.exclude)
 stopCluster(cluster)
 registerDoSEQ()
-
-## Metrics
 metrics = data.frame()
 confTrainTreeResult = confusionMatrix(predTrainTreeResult, fbmodeltraining$result)
 metrics = rbind(metrics, c('Result', 'Training','RPart Tree',confTrainTreeResult$overall))
@@ -112,9 +147,6 @@ confTrainSVMRadialResult = confusionMatrix(predTrainSVMRadialResult, fbmodeltrai
 metrics = rbind(metrics, c('Result', 'Training', 'SVM Radial', confTrainSVMRadialResult$overall))
 confTrainRFStackedResult = confusionMatrix(predTrainRFStackedResult, fbmodeltraining$result)
 metrics = rbind(metrics, c('Result', 'Training', 'Stacked Random Forest', confTrainRFStackedResult$overall))
-
-
-## Predict testing values for result
 predTestTreeResult = predict(fitTreeResult, newdata = fbmodeltesting, na.action = na.exclude)
 predTestRFResult = predict(fitRFResult, newdata = fbmodeltesting, na.action = na.exclude)
 predTestNNResult = predict(fitNNResult, newdata = fbmodeltesting, na.action = na.exclude)
@@ -122,8 +154,6 @@ predTestLDAResult = predict(fitLDAResult, newdata = fbmodeltesting, na.action = 
 predTestRangerResult = predict(fitRangeresult, newdata = fbmodeltesting, na.action = na.exclude)
 predTestKNNResult = predict(fitKNNResult, newdata = fbmodeltesting, na.action = na.exclude)
 predTestSVMRadialResult = predict(fitSVMRadialesult, newdata = fbmodeltesting, na.action = na.exclude)
-
-## Stacked testing predictions
 stackedTestingPredictions = data.frame(matrix(NA, nrow = length(fbmodeltesting$result), ncol = 0))
 stackedTestingPredictions$result = fbmodeltesting$result
 stackedTestingPredictions$predTreeResult = predTestTreeResult
@@ -134,8 +164,6 @@ stackedTestingPredictions$predRangerResult = predTestRangerResult
 stackedTestingPredictions$predKNNResult = predTestKNNResult
 stackedTestingPredictions$predSVMRadialResult = predTestSVMRadialResult
 predTestRFStackedResult = predict(fitRFStackedResult, newdata = stackedTestingPredictions, na.action = na.exclude)
-
-## Metrics
 confTestTreeResult = confusionMatrix(predTestTreeResult, fbmodeltesting$result)
 metrics = rbind(metrics, c('Result', 'Testing', 'RPart Tree', confTestTreeResult$overall))
 confTestRFResult = confusionMatrix(predTestRFResult, fbmodeltesting$result)
@@ -152,27 +180,23 @@ confTestSVMRadialResult = confusionMatrix(predTestSVMRadialResult, fbmodeltestin
 metrics = rbind(metrics, c('Result', 'Testing', 'SVM Radial', confTestSVMRadialResult$overall))
 confTestRFStackedResult = confusionMatrix(predTestRFStackedResult, fbmodeltesting$result)
 metrics = rbind(metrics, c('Result', 'Testing', 'Stacked Random Forest', confTestRFStackedResult$overall))
+```
 
+For additional information regarding the code, please refer to 
+code files in https://github.com/sgomezgomez/DevelopingDataProducts_FinalAssignment.
 
-
-metrics
+```{r warning = FALSE, fig.height = 3.5, echo = FALSE}
 metrics$Model = as.factor(metrics$Model)
 metrics$`Data Source` = as.factor(metrics$`Data Source`)
 g <- ggplot(metrics, aes(x = Model, Accuracy, fill = `Data Source`))
 g + geom_col(position = "dodge") +
         ggtitle("Model Accuracy per training and testing data sets") +
-        labs(caption = 'Caption: This figure plots the accuracy per prediction model') +
+        labs(caption = 'Caption: Plots the accuracy from all prediction  models against the training and testing sets. 
+             It is important to mention that accuracy values against the testing set were not good, 
+             and further work will be required to improve predictions.') +
         xlab('Prediction model') +
         ylab('Accurary') +
         theme(plot.title = element_text(hjust = 0.5, size = 16)) +
         theme(axis.text.x = element_text(size = 6, angle = 45, hjust = .5, vjust = .5, face = "plain"))
+```
 
-saveRDS(fitTreeResult, file = 'ShinyAppFinalAssignment/EuropeanFootballResultPredictionModel_FinalAssignment/fitTreeResult.rds')
-saveRDS(fitRFResult, file = 'ShinyAppFinalAssignment/EuropeanFootballResultPredictionModel_FinalAssignment/fitRFResult.rds')
-saveRDS(fitNNResult, file = 'ShinyAppFinalAssignment/EuropeanFootballResultPredictionModel_FinalAssignment/fitNNResult.rds')
-saveRDS(fitLDAResult, file = 'ShinyAppFinalAssignment/EuropeanFootballResultPredictionModel_FinalAssignment/fitLDAResult.rds')
-saveRDS(fitRangeresult, file = 'ShinyAppFinalAssignment/EuropeanFootballResultPredictionModel_FinalAssignment/fitRangeresult.rds')
-saveRDS(fitKNNResult, file = 'ShinyAppFinalAssignment/EuropeanFootballResultPredictionModel_FinalAssignment/fitKNNResult.rds')
-saveRDS(fitSVMRadialesult, file = 'ShinyAppFinalAssignment/EuropeanFootballResultPredictionModel_FinalAssignment/fitSVMRadialesult.rds')
-saveRDS(fitRFStackedResult, file = 'ShinyAppFinalAssignment/EuropeanFootballResultPredictionModel_FinalAssignment/fitRFStackedResult.rds')
-saveRDS(metrics, file = 'ShinyAppFinalAssignment/EuropeanFootballResultPredictionModel_FinalAssignment/metrics.rds')

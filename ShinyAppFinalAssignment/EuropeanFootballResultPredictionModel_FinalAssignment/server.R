@@ -13,6 +13,10 @@ library(parallel)
 library(doParallel)
 library(caretEnsemble)
 library(ranger)
+library(randomForest)
+library(e1071)
+library(kernlab)
+library(ggplot2)
 
 ## Model object loading
 fitTreeResult <- readRDS(file = 'fitTreeResult.rds',.GlobalEnv)
